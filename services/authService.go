@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/OCP-on-NERC/prom-keycloak-proxy/src/errors"
+	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
 
 	"github.com/Nerzal/gocloak/v13"
 	_ "github.com/gorilla/mux"
