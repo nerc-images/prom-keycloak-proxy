@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
+	"github.com/OCP-on-NERC/prom-keycloak-proxy/queries"
+	"github.com/prometheus/prometheus/promql/parser"
 
 	"github.com/Nerzal/gocloak/v13"
 	_ "github.com/gorilla/mux"
@@ -71,16 +73,28 @@ func Protect(client *gocloak.GoCloak, next http.Handler) http.Handler {
 			json.NewEncoder(w).Encode(errors.UnauthorizedError())
 			return
 		}
+
+		queryValues := r.URL.Query()
+		queryValuesForAuth, err := queries.ParseAuthorizations(queryValues)
+		matchers := queryValuesForAuth[queries.QueryParam]
+		var permissions []string
+
+		// Inject label into existing matchers.
+		for _, matcher := range matchers {
+			matcherSelector, _ := parser.ParseMetricSelector(matcher)
+
+			for _, matcherSelector := range matcherSelector {
+				permissions = append(permissions, matcherSelector.Name+"#"+matcherSelector.Value)
+			}
+		}
+
 		rpp, err := client.GetRequestingPartyPermissions(
 			context.Background(),
 			accessToken,
 			realm,
 			gocloak.RequestingPartyTokenOptions{
-				Audience: gocloak.StringP(clientId),
-				Permissions: &[]string{
-					"cluster#nerc-ocp-prod",
-					"namespace#all namespaces",
-				},
+				Audience:    gocloak.StringP(clientId),
+				Permissions: &permissions,
 			},
 		)
 		if err != nil {
