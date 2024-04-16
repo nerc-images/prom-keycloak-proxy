@@ -7,10 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
@@ -19,6 +16,7 @@ import (
 
 	"github.com/Nerzal/gocloak/v13"
 	_ "github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
 type LoginResponse struct {
@@ -27,26 +25,19 @@ type LoginResponse struct {
 	Description string `json:"Description"`
 }
 
-var (
-	clientId            = os.Getenv("AUTH_CLIENT_ID")
-	clientSecret        = os.Getenv("AUTH_CLIENT_SECRET")
-	realm               = os.Getenv("AUTH_REALM")
-	auth_base_url       = os.Getenv("AUTH_BASE_URL")
-	auth_skip_verify, _ = strconv.ParseBool(os.Getenv("AUTH_SKIP_VERIFY"))
-)
-
-func InitializeOauthServer() *gocloak.GoCloak {
-	client := gocloak.NewClient(auth_base_url)
-	if auth_skip_verify {
+func InitializeOauthServer(authBaseUrl string, authTlsVerify bool) *gocloak.GoCloak {
+	client := gocloak.NewClient(authBaseUrl)
+	if !authTlsVerify {
 		restyClient := client.RestyClient()
-		restyClient.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		restyClient.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: !authTlsVerify})
 	}
 	return client
 }
 
-func Protect(client *gocloak.GoCloak, next http.Handler) http.Handler {
+func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get(queries.QueryParam)
 
 		authHeader := r.Header.Get("Authorization")
 
@@ -58,10 +49,19 @@ func Protect(client *gocloak.GoCloak, next http.Handler) http.Handler {
 
 		accessToken := strings.Split(authHeader, " ")[1]
 
-		rptResult, err := client.RetrospectToken(r.Context(), accessToken, clientId, clientSecret, realm)
+		rptResult, err := gocloakClient.RetrospectToken(r.Context(), accessToken, authClientId, authClientSecret, authRealm)
 
 		if err != nil {
-			w.WriteHeader(400)
+			log.Warn().
+				Int("status", 401).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg("Unauthorized")
+
+			w.WriteHeader(401)
 			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
 			return
 		}
@@ -69,13 +69,22 @@ func Protect(client *gocloak.GoCloak, next http.Handler) http.Handler {
 		isTokenValid := *rptResult.Active
 
 		if !isTokenValid {
+			log.Warn().
+				Int("status", 401).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg("Unauthorized")
+
 			w.WriteHeader(401)
 			json.NewEncoder(w).Encode(errors.UnauthorizedError())
 			return
 		}
 
 		queryValues := r.URL.Query()
-		queryValuesForAuth, err := queries.ParseAuthorizations(queryValues)
+		queryValuesForAuth := queries.ParseAuthorizations(queryValues)
 		matchers := queryValuesForAuth[queries.QueryParam]
 		var permissions []string
 
@@ -88,27 +97,56 @@ func Protect(client *gocloak.GoCloak, next http.Handler) http.Handler {
 			}
 		}
 
-		rpp, err := client.GetRequestingPartyPermissions(
+		rpp, err := gocloakClient.GetRequestingPartyPermissions(
 			context.Background(),
 			accessToken,
-			realm,
+			authRealm,
 			gocloak.RequestingPartyTokenOptions{
-				Audience:    gocloak.StringP(clientId),
+				Audience:    gocloak.StringP(authClientId),
 				Permissions: &permissions,
 			},
 		)
-		if err != nil {
-			w.WriteHeader(401)
+
+		if err != nil || len(*rpp) < 2 {
+			log.Warn().
+				Int("status", 403).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg("Forbidden")
+
+			w.WriteHeader(403)
 			json.NewEncoder(w).Encode(errors.UnauthorizedError())
 			return
 		}
+
 		out, err := json.Marshal(*rpp)
 		if err != nil {
+			log.Warn().
+				Int("status", 400).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg("Bad Request")
+
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
 			return
 		}
-		fmt.Print(string(out))
+
+		log.Info().
+			Int("status", 200).
+			Str("method", r.Method).
+			Str("path", r.RequestURI).
+			Str("ip", r.RemoteAddr).
+			Str("client-id", authClientId).
+			Str("query", query).
+			RawJSON("permissions", out).
+			Msg("OK")
 
 		// Our middleware logic goes here...
 		next.ServeHTTP(w, r)
