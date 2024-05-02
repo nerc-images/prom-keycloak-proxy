@@ -15,14 +15,14 @@ spec:
             - "ReadWriteOnce"
             resources:
               requests:
-                storage: 10Gi
+                storage: 5Gi
   instances:
     - dataVolumeClaimSpec:
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 10Gi
+            storage: 5Gi
       replicas: 1
       name: 'postgres'
   image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-gis:ubi8-15.1-3.3-0
