@@ -98,14 +98,14 @@ func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,
 
 	prometheusCaCert, err := os.ReadFile(prometheusCaCertPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(prometheusCaCert)
 	cert, err := tls.LoadX509KeyPair(prometheusTlsCertPath, prometheusTlsKeyPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	client := &http.Client{
