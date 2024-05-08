@@ -21,17 +21,9 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 			queryValues := r.URL.Query()
 			matchers := queryValues[queries.QueryParam]
 			v := make(url.Values)
-			//matchersForAuth := queryValuesForAuth[queries.QueryParam]
 			for _, matcher := range matchers {
 				expr, _ := parser.ParseExpr(matcher)
 				v.Set(queries.QueryParam, expr.String())
-				//matcherSelector, _ := parser.ParseMetricSelector(matcher)
-
-				//for _, matcherSelector := range matcherSelector {
-				//	if matcherSelector.Name == key {
-				//		value = matcherSelector.Value
-				//	}
-				//}
 			}
 			prometheusUrl := prometheusBaseUrl + r.URL.Path + "?" + v.Encode()
 
