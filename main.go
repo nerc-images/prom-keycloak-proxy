@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -16,7 +15,6 @@ import (
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/services"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -93,11 +91,11 @@ func run() {
 	}
 }
 
-func metricsHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	return mux
-}
+//func metricsHandler() http.Handler {
+//	mux := http.NewServeMux()
+//	mux.Handle("/metrics", promhttp.Handler())
+//	return mux
+//}
 
 func rootRunE(cmd *cobra.Command, args []string) error {
 	proxyPrometheusBaseUrl, err := url.Parse(viper.GetString("proxy-prometheus-base-url"))
