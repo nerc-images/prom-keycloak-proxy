@@ -6,7 +6,6 @@ package services
 import (
 	"encoding/json"
 	"net/http"
-	"net/url"
 
 	"github.com/Nerzal/gocloak/v13"
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
@@ -20,12 +19,12 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 
 			queryValues := r.URL.Query()
 			matchers := queryValues[queries.QueryParam]
-			v := make(url.Values)
+			//v := make(url.Values)
 			for _, matcher := range matchers {
 				expr, _ := parser.ParseExpr(matcher)
-				v.Set(queries.QueryParam, expr.String())
+				queryValues.Set(queries.QueryParam, expr.String())
 			}
-			prometheusUrl := prometheusBaseUrl + r.URL.Path + "?" + v.Encode()
+			prometheusUrl := prometheusBaseUrl + r.URL.Path + "?" + queryValues.Encode()
 
 			data, err := queries.QueryPrometheus(prometheusTlsCertPath, prometheusTlsKeyPath, prometheusCaCertPath, prometheusUrl)
 			if err == nil {
