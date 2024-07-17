@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
@@ -84,7 +85,7 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 		}
 
 		queryValues := r.URL.Query()
-		queryValuesForAuth := queries.ParseAuthorizations(queryValues)
+		queryValuesForAuth, keys, values := queries.ParseAuthorizations(queryValues)
 		matchers := queryValuesForAuth[queries.QueryParam]
 		var permissions []string
 
@@ -107,7 +108,7 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 			},
 		)
 
-		if err != nil || len(*rpp) < 2 {
+		if err != nil {
 			log.Warn().
 				Int("status", 403).
 				Str("method", r.Method).
@@ -138,15 +139,54 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 			return
 		}
 
-		log.Info().
-			Int("status", 200).
-			Str("method", r.Method).
-			Str("path", r.RequestURI).
-			Str("ip", r.RemoteAddr).
-			Str("client-id", authClientId).
-			Str("query", query).
-			RawJSON("permissions", out).
-			Msg("OK")
+		var final_result bool = true
+		var unauthorized_key string = ""
+		var unauthorized_value string = ""
+		for i, key := range keys {
+			value := values[i]
+			current_result := false
+			for _, permission := range *rpp {
+				if key == *permission.ResourceName && slices.Contains(*permission.Scopes, value) {
+					current_result = true
+					break
+				}
+			}
+			if !current_result {
+				final_result = false
+				unauthorized_key = key
+				unauthorized_value = value
+				break
+			}
+		}
+
+		if final_result {
+			log.Info().
+				Int("status", 200).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				RawJSON("permissions", out).
+				Msg("OK")
+		} else {
+			message := "You are not authorized to access the resource \"" + unauthorized_key + "\" with scope \"" + unauthorized_value + "\""
+			log.Warn().
+				Int("status", 403).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg(message)
+
+			w.WriteHeader(403)
+			json.NewEncoder(w).Encode(errors.HttpError{
+				Code:    403,
+				Error:   "Forbidden",
+				Message: message})
+			return
+		}
 
 		// Our middleware logic goes here...
 		next.ServeHTTP(w, r)
