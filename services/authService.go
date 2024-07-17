@@ -67,6 +67,27 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 			return
 		}
 
+		userInfo, err := gocloakClient.GetUserInfo(context.Background(), accessToken, authRealm)
+		if err != nil {
+			log.Warn().
+				Int("status", 401).
+				Str("method", r.Method).
+				Str("path", r.RequestURI).
+				Str("ip", r.RemoteAddr).
+				Str("client-id", authClientId).
+				Str("query", query).
+				Msg("Unauthorized")
+
+			w.WriteHeader(401)
+			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
+			return
+		}
+		username := *userInfo.PreferredUsername
+		var userClientId string = ""
+		if strings.Contains(username, "service-account-") {
+			userClientId = strings.ReplaceAll(username, "service-account-", "")
+		}
+
 		isTokenValid := *rptResult.Active
 
 		if !isTokenValid {
@@ -75,7 +96,8 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				Str("method", r.Method).
 				Str("path", r.RequestURI).
 				Str("ip", r.RemoteAddr).
-				Str("client-id", authClientId).
+				Str("username", username).
+				Str("client-id", userClientId).
 				Str("query", query).
 				Msg("Unauthorized")
 
@@ -114,9 +136,10 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				Str("method", r.Method).
 				Str("path", r.RequestURI).
 				Str("ip", r.RemoteAddr).
-				Str("client-id", authClientId).
+				Str("username", username).
+				Str("client-id", userClientId).
 				Str("query", query).
-				Msg("Forbidden")
+				Msg(err.Error())
 
 			w.WriteHeader(403)
 			json.NewEncoder(w).Encode(errors.UnauthorizedError())
@@ -130,7 +153,8 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				Str("method", r.Method).
 				Str("path", r.RequestURI).
 				Str("ip", r.RemoteAddr).
-				Str("client-id", authClientId).
+				Str("username", username).
+				Str("client-id", userClientId).
 				Str("query", query).
 				Msg("Bad Request")
 
@@ -165,7 +189,8 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				Str("method", r.Method).
 				Str("path", r.RequestURI).
 				Str("ip", r.RemoteAddr).
-				Str("client-id", authClientId).
+				Str("username", username).
+				Str("client-id", userClientId).
 				Str("query", query).
 				RawJSON("permissions", out).
 				Msg("OK")
@@ -176,7 +201,8 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				Str("method", r.Method).
 				Str("path", r.RequestURI).
 				Str("ip", r.RemoteAddr).
-				Str("client-id", authClientId).
+				Str("username", username).
+				Str("client-id", userClientId).
 				Str("query", query).
 				Msg(message)
 
