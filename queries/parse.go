@@ -63,7 +63,7 @@ func InjectMatcher(q url.Values, matcher *labels.Matcher) error {
 	return nil
 }
 
-func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key string, defaultValue string) error {
+func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key string, authKey string, defaultValue string) (string, string, error) {
 	value := defaultValue
 	matchers := queryValues[QueryParam]
 	for _, matcher := range matchers {
@@ -76,21 +76,32 @@ func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key st
 		}
 	}
 	matcher := &labels.Matcher{
-		Name:  key,
+		Name:  authKey,
 		Type:  labels.MatchRegexp,
 		Value: LabelValuesToRegexpString([]string{value}),
 	}
 	err := InjectMatcher(queryValuesForAuth, matcher)
-	return err
+	return authKey, value, err
 }
 
-func ParseAuthorizations(queryValues url.Values) url.Values {
+func ParseAuthorizations(queryValues url.Values) (url.Values, []string, []string) {
 	queryValuesForAuth := make(url.Values)
 
-	AppendMatcher(queryValues, queryValuesForAuth, "cluster", "all clusters")
-	AppendMatcher(queryValues, queryValuesForAuth, "namespace", "all namespaces")
+	var keys []string
+	var values []string
+	cluster_key, cluster, _ := AppendMatcher(queryValues, queryValuesForAuth, "cluster", "cluster", "all clusters")
+	keys = append(keys, cluster_key)
+	values = append(values, cluster)
 
-	return queryValuesForAuth
+	exported_namespace_key, exported_namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "exported_namespace", "namespace", "all namespaces")
+	keys = append(keys, exported_namespace_key)
+	values = append(values, exported_namespace)
+
+	namespace_key, namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "namespace", "namespace", exported_namespace)
+	keys = append(keys, namespace_key)
+	values = append(values, namespace)
+
+	return queryValuesForAuth, keys, values
 }
 
 func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,

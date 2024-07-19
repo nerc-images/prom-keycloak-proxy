@@ -19,7 +19,6 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 
 			queryValues := r.URL.Query()
 			matchers := queryValues[queries.QueryParam]
-			//v := make(url.Values)
 			for _, matcher := range matchers {
 				expr, _ := parser.ParseExpr(matcher)
 				queryValues.Set(queries.QueryParam, expr.String())
