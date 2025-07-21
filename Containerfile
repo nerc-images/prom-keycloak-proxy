@@ -2,10 +2,11 @@ FROM docker.io/golang:1.22
 
 ENV PROXY_AUTH_CLIENT_ID="" \
   PROXY_AUTH_CLIENT_SECRET="" \
-  PROXY_AUTH_REALM="NERC" \
-  PROXY_AUTH_BASE_URL="https://keycloak.apps-crc.testing" \
+  PROXY_ACM_HUB="" \
+  PROXY_AUTH_REALM="" \
+  PROXY_AUTH_BASE_URL="" \
   PROXY_AUTH_TLS_VERIFY="true" \
-  PROXY_PROMETHEUS_BASE_URL="https://observatorium-api-open-cluster-management-observability.apps.example.com/api/metrics/v1/default" \
+  PROXY_PROMETHEUS_BASE_URL="" \
   PROXY_PROMETHEUS_CA_CRT="/opt/proxy-prometheus-ca.crt" \
   PROXY_PROMETHEUS_TLS_CRT="/opt/proxy-prometheus-tls.crt" \
   PROXY_PROMETHEUS_TLS_KEY="/opt/proxy-prometheus-tls.key"

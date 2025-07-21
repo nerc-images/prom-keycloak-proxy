@@ -7,13 +7,13 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/queries"
-	"github.com/prometheus/prometheus/promql/parser"
 
 	"github.com/Nerzal/gocloak/v13"
 	_ "github.com/gorilla/mux"
@@ -35,7 +35,7 @@ func InitializeOauthServer(authBaseUrl string, authTlsVerify bool) *gocloak.GoCl
 	return client
 }
 
-func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, next http.Handler) http.Handler {
+func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, proxyAcmHub string, next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get(queries.QueryParam)
@@ -107,17 +107,12 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 		}
 
 		queryValues := r.URL.Query()
-		queryValuesForAuth, keys, values := queries.ParseAuthorizations(queryValues)
-		matchers := queryValuesForAuth[queries.QueryParam]
+		_, authResourceNames, authResourceScopes := queries.ParseAuthorizations(hubKey, clusterKey, projectKey, proxyAcmHub, queryValues)
 		var permissions []string
 
-		// Inject label into existing matchers.
-		for _, matcher := range matchers {
-			matcherSelector, _ := parser.ParseMetricSelector(matcher)
-
-			for _, matcherSelector := range matcherSelector {
-				permissions = append(permissions, matcherSelector.Name+"#"+matcherSelector.Value)
-			}
+		for index, authResourceName := range authResourceNames {
+			authScopeName := authResourceScopes[index]
+			permissions = append(permissions, fmt.Sprintf("%s#%s", authResourceName, authScopeName))
 		}
 
 		rpp, err := gocloakClient.GetRequestingPartyPermissions(
@@ -166,9 +161,9 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 		var final_result bool = true
 		var unauthorized_key string = ""
 		var unauthorized_value string = ""
-		for i, key := range keys {
-			value := values[i]
-			current_result := false
+		var current_result = false
+		for i, key := range authResourceNames {
+			value := authResourceScopes[i]
 			for _, permission := range *rpp {
 				if key == *permission.ResourceName && slices.Contains(*permission.Scopes, value) {
 					current_result = true
@@ -176,11 +171,12 @@ func Protect(gocloakClient *gocloak.GoCloak, authRealm string, authClientId stri
 				}
 			}
 			if !current_result {
-				final_result = false
 				unauthorized_key = key
 				unauthorized_value = value
-				break
 			}
+		}
+		if !current_result {
+			final_result = false
 		}
 
 		if final_result {

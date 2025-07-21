@@ -10,9 +10,11 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/services"
+	"github.com/go-playground/validator/v10"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/cors"
@@ -21,6 +23,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var validate *validator.Validate
 
 func main() {
 	run()
@@ -46,29 +50,29 @@ func run() {
 	cobrautil.RegisterHTTPServerFlags(flags, "proxy", "proxy", ":8080", true)
 	flags.StringSlice("proxy-cors-allowed-origins", []string{"*"}, "allowed origins for CORS requests")
 
-	flags.Bool("proxy-auth-client-id", true, "Keycloak auth client ID")
+	flags.String("proxy-acm-hub", "", "ACM Hub name")
+	viper.BindPFlag("proxy-acm-hub", flags.Lookup("proxy-acm-hub"))
+	viper.BindEnv("proxy-acm-hub", "PROXY_ACM_HUB")
+
+	flags.String("proxy-auth-client-id", "", "Keycloak auth client ID")
 	viper.BindPFlag("proxy-auth-client-id", flags.Lookup("proxy-auth-client-id"))
 	viper.BindEnv("proxy-auth-client-id", "PROXY_AUTH_CLIENT_ID")
 
-	flags.Bool("proxy-auth-client-secret", true, "Keycloak auth client secret")
+	flags.String("proxy-auth-client-secret", "", "Keycloak auth client secret")
 	viper.BindPFlag("proxy-auth-client-secret", flags.Lookup("proxy-auth-client-secret"))
 	viper.BindEnv("proxy-auth-client-secret", "PROXY_AUTH_CLIENT_SECRET")
 
-	flags.Bool("proxy-auth-realm", true, "Keycloak auth realm")
+	flags.String("proxy-auth-realm", "", "Keycloak auth realm")
 	viper.BindPFlag("proxy-auth-realm", flags.Lookup("proxy-auth-realm"))
 	viper.BindEnv("proxy-auth-realm", "PROXY_AUTH_REALM")
 
-	flags.Bool("proxy-auth-base-url", true, "Keycloak base URL")
+	flags.String("proxy-auth-base-url", "", "Keycloak base URL")
 	viper.BindPFlag("proxy-auth-base-url", flags.Lookup("proxy-auth-base-url"))
 	viper.BindEnv("proxy-auth-base-url", "PROXY_AUTH_BASE_URL")
 
 	flags.Bool("proxy-auth-tls-verify", true, "connect to keycloak and verify valid TLS")
 	viper.BindPFlag("proxy-auth-tls-verify", flags.Lookup("proxy-auth-tls-verify"))
 	viper.BindEnv("proxy-auth-tls-verify", "PROXY_AUTH_TLS_VERIFY")
-
-	flags.Bool("proxy-prometheus-insecure", true, "connect to prometheus and verify valid TLS")
-	viper.BindPFlag("proxy-prometheus-insecure", flags.Lookup("proxy-prometheus-tls-verify"))
-	viper.BindEnv("proxy-prometheus-insecure", "PROXY_PROMETHEUS_TLS_VERIFY")
 
 	flags.String("proxy-prometheus-base-url", "", "address of the prometheus to use for checking")
 	viper.BindPFlag("proxy-prometheus-base-url", flags.Lookup("proxy-prometheus-base-url"))
@@ -86,38 +90,86 @@ func run() {
 	viper.BindPFlag("proxy-prometheus-ca-crt", flags.Lookup("proxy-prometheus-ca-crt"))
 	viper.BindEnv("proxy-prometheus-ca-crt", "PROXY_PROMETHEUS_CA_CRT")
 
+	flags.String("proxy-hub-key", "", "The hub key to use for auth resources")
+	viper.BindPFlag("proxy-hub-key", flags.Lookup("proxy-hub-key"))
+	viper.BindEnv("proxy-hub-key", "PROXY_HUB_KEY")
+
+	flags.String("proxy-cluster-key", "", "The cluster key to use for auth resources")
+	viper.BindPFlag("proxy-cluster-key", flags.Lookup("proxy-cluster-key"))
+	viper.BindEnv("proxy-cluster-key", "PROXY_CLUSTER_KEY")
+
+	flags.String("proxy-project-key", "", "The project key to use for auth resources")
+	viper.BindPFlag("proxy-project-key", flags.Lookup("proxy-project-key"))
+	viper.BindEnv("proxy-project-key", "PROXY_PROJECT_KEY")
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-//func metricsHandler() http.Handler {
-//	mux := http.NewServeMux()
-//	mux.Handle("/metrics", promhttp.Handler())
-//	return mux
-//}
+func ValidateAlphanumericWithHyphen(fl validator.FieldLevel) bool {
+	//  Regex to match alphanumeric characters and hyphens
+	regex := regexp.MustCompile("^[a-zA-Z0-9-]+$")
+	return regex.MatchString(fl.Field().String())
+}
 
 func rootRunE(cmd *cobra.Command, args []string) error {
+
 	proxyPrometheusBaseUrl, err := url.Parse(viper.GetString("proxy-prometheus-base-url"))
 	if err != nil {
 		return fmt.Errorf("failed to build parse upstream URL: %w", err)
 	}
-
 	if !stringz.SliceContains([]string{"http", "https"}, proxyPrometheusBaseUrl.Scheme) {
 		return errors.New("only 'http' and 'https' schemes are supported for the upstream prometheus URL")
 	}
 
-	authBaseUrl := viper.GetString("proxy-auth-base-url")
-	authRealm := viper.GetString("proxy-auth-realm")
-	authClientId := viper.GetString("proxy-auth-client-id")
-	authClientSecret := viper.GetString("proxy-auth-client-secret")
-	authTlsVerify := viper.GetBool("proxy-auth-tls-verify")
-	gocloakClient := services.InitializeOauthServer(authBaseUrl, authTlsVerify)
+	validate = validator.New(validator.WithRequiredStructEnabled())
+	validate.RegisterValidation("alphanumhyphen", ValidateAlphanumericWithHyphen)
 
-	prometheusBaseUrl := viper.GetString("proxy-prometheus-base-url")
-	prometheusTlsCertPath := viper.GetString("proxy-prometheus-tls-crt")
-	prometheusTlsKeyPath := viper.GetString("proxy-prometheus-tls-key")
-	prometheusCaCertPath := viper.GetString("proxy-prometheus-ca-crt")
+	type ProxyVars struct {
+		ProxyAcmHub            string `validate:"required,alphanumhyphen,lowercase"`
+		ProxyAuthClientId      string `validate:"required,alphanumhyphen"`
+		ProxyAuthClientSecret  string `validate:"required,ascii"`
+		ProxyAuthRealm         string `validate:"required,alphanumhyphen"`
+		ProxyAuthBaseUrl       string `validate:"required,url"`
+		ProxyAuthTlsVerify     bool   `validate:"required"`
+		ProxyPrometheusBaseUrl string `validate:"required,url"`
+		ProxyPrometheusTlsCert string `validate:"required,filepath"`
+		ProxyPrometheusTlsKey  string `validate:"required,filepath"`
+		ProxyPrometheusCaCrt   string `validate:"required,filepath"`
+		ProxyHubKey            string `validate:"required,alphanum"`
+		ProxyClusterKey        string `validate:"required,alphanum"`
+		ProxyProjectKey        string `validate:"required,alphanum"`
+	}
+
+	vars := &ProxyVars{
+		ProxyAcmHub:            viper.GetString("proxy-acm-hub"),
+		ProxyAuthClientId:      viper.GetString("proxy-auth-client-id"),
+		ProxyAuthClientSecret:  viper.GetString("proxy-auth-client-secret"),
+		ProxyAuthRealm:         viper.GetString("proxy-auth-realm"),
+		ProxyAuthBaseUrl:       viper.GetString("proxy-auth-base-url"),
+		ProxyAuthTlsVerify:     viper.GetBool("proxy-auth-tls-verify"),
+		ProxyPrometheusBaseUrl: viper.GetString("proxy-prometheus-base-url"),
+		ProxyPrometheusTlsCert: viper.GetString("proxy-prometheus-tls-crt"),
+		ProxyPrometheusTlsKey:  viper.GetString("proxy-prometheus-tls-key"),
+		ProxyPrometheusCaCrt:   viper.GetString("proxy-prometheus-ca-crt"),
+		ProxyHubKey:            viper.GetString("proxy-hub-key"),
+		ProxyClusterKey:        viper.GetString("proxy-cluster-key"),
+		ProxyProjectKey:        viper.GetString("proxy-project-key"),
+	}
+	validation_error := validate.Struct(vars)
+	if validation_error != nil {
+		var invalidValidationError *validator.InvalidValidationError
+		if errors.As(validation_error, &invalidValidationError) {
+			return fmt.Errorf("Validating the environment variables failed", validation_error)
+		}
+		var validateErrs validator.ValidationErrors
+		if errors.As(validation_error, &validateErrs) {
+			return fmt.Errorf("Validating the environment variables failed", validation_error)
+		}
+	}
+	gocloakClient := services.InitializeOauthServer(vars.ProxyAuthBaseUrl, vars.ProxyAuthTlsVerify)
+
 	const proxyPrefix = "proxy"
 	proxySrv := cobrautil.HTTPServerFromFlags(cmd, proxyPrefix)
 	proxySrv.Handler = logHandler(cors.New(cors.Options{
@@ -127,34 +179,28 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 		Debug:            log.Debug().Enabled(),
 	}).Handler(
 		services.Protect(
+			vars.ProxyHubKey,
+			vars.ProxyClusterKey,
+			vars.ProxyProjectKey,
 			gocloakClient,
-			authRealm,
-			authClientId,
-			authClientSecret,
+			vars.ProxyAuthRealm,
+			vars.ProxyAuthClientId,
+			vars.ProxyAuthClientSecret,
+			vars.ProxyAcmHub,
 			services.PromQueryHandler(
 				gocloakClient,
-				authRealm,
-				authClientId,
-				prometheusBaseUrl,
-				prometheusTlsCertPath,
-				prometheusTlsKeyPath,
-				prometheusCaCertPath))))
+				vars.ProxyAuthRealm,
+				vars.ProxyAuthClientId,
+				vars.ProxyPrometheusBaseUrl,
+				vars.ProxyPrometheusTlsCert,
+				vars.ProxyPrometheusTlsKey,
+				vars.ProxyPrometheusCaCrt))))
 	go func() {
 		if err := cobrautil.HTTPListenFromFlags(cmd, proxyPrefix, proxySrv, zerolog.InfoLevel); err != nil {
 			log.Fatal().Err(err).Msg("failed while serving proxy")
 		}
 	}()
 	defer proxySrv.Close()
-
-	//	const metricsPrefix = "metrics"
-	//	metricsSrv := cobrautil.HTTPServerFromFlags(cmd, metricsPrefix)
-	//	metricsSrv.Handler = metricsHandler()
-	//	go func() {
-	//		if err := cobrautil.HTTPListenFromFlags(cmd, metricsPrefix, metricsSrv, zerolog.InfoLevel); err != nil {
-	//			log.Fatal().Err(err).Msg("failed while serving metrics")
-	//		}
-	//	}()
-	//	defer metricsSrv.Close()
 
 	signalctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	<-signalctx.Done() // Block until we've received a signal.
