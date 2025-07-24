@@ -66,10 +66,6 @@ func run() {
 	viper.BindPFlag("proxy-auth-tls-verify", flags.Lookup("proxy-auth-tls-verify"))
 	viper.BindEnv("proxy-auth-tls-verify", "PROXY_AUTH_TLS_VERIFY")
 
-	flags.Bool("proxy-prometheus-insecure", true, "connect to prometheus and verify valid TLS")
-	viper.BindPFlag("proxy-prometheus-insecure", flags.Lookup("proxy-prometheus-tls-verify"))
-	viper.BindEnv("proxy-prometheus-insecure", "PROXY_PROMETHEUS_TLS_VERIFY")
-
 	flags.String("proxy-prometheus-base-url", "", "address of the prometheus to use for checking")
 	viper.BindPFlag("proxy-prometheus-base-url", flags.Lookup("proxy-prometheus-base-url"))
 	viper.BindEnv("proxy-prometheus-base-url", "PROXY_PROMETHEUS_BASE_URL")
