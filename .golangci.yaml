@@ -19,6 +19,9 @@ linters:
       - path: '(.+)_test\.go'
         linters:
         - errcheck
+      - path: 'queriestest/parse_test.go'
+        linters:
+        - unused
   settings:
     misspell:
       locale: US
