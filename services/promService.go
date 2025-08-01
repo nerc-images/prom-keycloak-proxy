@@ -17,7 +17,6 @@ import (
 func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, prometheusBaseUrl string, prometheusTlsCertPath string, prometheusTlsKeyPath string, prometheusCaCertPath string) http.HandlerFunc {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-
 			queryValues := r.URL.Query()
 			matchers := queryValues[queries.QueryParam]
 			for _, matcher := range matchers {

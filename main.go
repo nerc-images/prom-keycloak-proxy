@@ -30,7 +30,6 @@ func main() {
 	run()
 }
 func run() {
-
 	rootCmd := &cobra.Command{
 		Use:     "prom-keycloak-proxy",
 		Short:   "Proxy that protects Prometheus queries with Keycloak fine-grained resource permissions",
@@ -114,7 +113,6 @@ func ValidateAlphanumericWithHyphen(fl validator.FieldLevel) bool {
 }
 
 func rootRunE(cmd *cobra.Command, args []string) error {
-
 	proxyPrometheusBaseUrl, err := url.Parse(viper.GetString("proxy-prometheus-base-url"))
 	if err != nil {
 		return fmt.Errorf("failed to build parse upstream URL: %w", err)

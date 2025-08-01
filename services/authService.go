@@ -36,7 +36,6 @@ func InitializeOauthServer(authBaseUrl string, authTlsVerify bool) *gocloak.GoCl
 }
 
 func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, proxyAcmHub string, next http.Handler) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get(queries.QueryParam)
 
@@ -83,7 +82,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 			return
 		}
 		username := *userInfo.PreferredUsername
-		var userClientId string = ""
+		var userClientId = ""
 		if strings.Contains(username, "service-account-") {
 			userClientId = strings.ReplaceAll(username, "service-account-", "")
 		}
@@ -158,9 +157,9 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 			return
 		}
 
-		var final_result bool = true
-		var unauthorized_key string = ""
-		var unauthorized_value string = ""
+		var final_result = true
+		var unauthorized_key = ""
+		var unauthorized_value = ""
 		var current_result = false
 		for i, key := range authResourceNames {
 			value := authResourceScopes[i]
