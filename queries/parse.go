@@ -63,45 +63,65 @@ func InjectMatcher(q url.Values, matcher *labels.Matcher) error {
 	return nil
 }
 
-func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key string, authKey string, defaultValue string) (string, string, error) {
+func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key string, authKey string, defaultValue string) (string, error) {
 	value := defaultValue
-	matchers := queryValues[QueryParam]
-	for _, matcher := range matchers {
-		matcherSelector, _ := parser.ParseMetricSelector(matcher)
-
+	expr, exprErr := parser.ParseExpr(queryValues[QueryParam][0])
+	matchers := parser.ExtractSelectors(expr)
+	if exprErr != nil {
+		log.Panic(exprErr)
+	}
+	for _, matcherSelector := range matchers {
 		for _, matcherSelector := range matcherSelector {
 			if matcherSelector.Name == key {
 				value = matcherSelector.Value
 			}
 		}
 	}
-	matcher := &labels.Matcher{
-		Name:  authKey,
-		Type:  labels.MatchRegexp,
-		Value: LabelValuesToRegexpString([]string{value}),
+
+	if value != "" {
+		matcher := &labels.Matcher{
+			Name:  authKey,
+			Type:  labels.MatchRegexp,
+			Value: LabelValuesToRegexpString([]string{value}),
+		}
+		err := InjectMatcher(queryValuesForAuth, matcher)
+		return value, err
 	}
-	err := InjectMatcher(queryValuesForAuth, matcher)
-	return authKey, value, err
+	return value, nil
 }
 
-func ParseAuthorizations(queryValues url.Values) (url.Values, []string, []string) {
+func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hub string, queryValues url.Values) (url.Values, []string, []string) {
 	queryValuesForAuth := make(url.Values)
 
-	var keys []string
-	var values []string
-	cluster_key, cluster, _ := AppendMatcher(queryValues, queryValuesForAuth, "cluster", "cluster", "all clusters")
-	keys = append(keys, cluster_key)
-	values = append(values, cluster)
+	var authResourceNames []string
+	var authScopeNames []string
 
-	exported_namespace_key, exported_namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "exported_namespace", "namespace", "all namespaces")
-	keys = append(keys, exported_namespace_key)
-	values = append(values, exported_namespace)
+	authResourceNames = append(authResourceNames, hubKey)
+	authScopeNames = append(authScopeNames, "GET")
 
-	namespace_key, namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "namespace", "namespace", exported_namespace)
-	keys = append(keys, namespace_key)
-	values = append(values, namespace)
+	authResourceNames = append(authResourceNames, fmt.Sprintf("%s-%s", hubKey, hub))
+	authScopeNames = append(authScopeNames, "GET")
 
-	return queryValuesForAuth, keys, values
+	cluster, _ := AppendMatcher(queryValues, queryValuesForAuth, "cluster", fmt.Sprintf("%s-%s-%s", hubKey, hub, clusterKey), "")
+
+	if cluster != "" {
+
+		authResourceNames = append(authResourceNames, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, cluster))
+		authScopeNames = append(authScopeNames, "GET")
+
+		exported_namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "exported_namespace", fmt.Sprintf("%s-%s-%s-%s-%s", hubKey, hub, clusterKey, cluster, projectKey), "")
+		namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "namespace", fmt.Sprintf("%s-%s-%s-%s-%s", hubKey, hub, clusterKey, cluster, projectKey), exported_namespace)
+
+		if namespace != "" {
+
+			if cluster != "" {
+				authResourceNames = append(authResourceNames, fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, cluster, projectKey, namespace))
+				authScopeNames = append(authScopeNames, "GET")
+			}
+		}
+	}
+
+	return queryValuesForAuth, authResourceNames, authScopeNames
 }
 
 func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,

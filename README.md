@@ -31,8 +31,9 @@ Obtain the Keycloak admin password in the `keycloak-initial-admin` Secret.
 
 ```bash
 PROXY_AUTH_BASE_URL=https://keycloak.apps-crc.testing
+PROXY_ACM_HUB=moc
 PROXY_AUTH_REALM=NERC
-PROXY_AUTH_CLIENT_ID=nerc
+PROXY_AUTH_CLIENT_ID=ai-telemetry
 PROXY_AUTH_CLIENT_SECRET=Find the client secret to query for authorization permissions by using the Keycloak admin
 ```
 
@@ -50,6 +51,7 @@ Run the prom-keycloak-proxy container by configuring the right connection inform
 podman run --rm -p 8080:8080 \
   -e PROXY_AUTH_CLIENT_ID=$PROXY_AUTH_CLIENT_ID \
   -e PROXY_AUTH_CLIENT_SECRET=$PROXY_AUTH_CLIENT_SECRET \
+  -e PROXY_ACM_HUB=$PROXY_ACM_HUB \
   -e PROXY_AUTH_REALM=$PROXY_AUTH_REALM \
   -e PROXY_AUTH_BASE_URL=$PROXY_AUTH_BASE_URL \
   -e PROXY_AUTH_TLS_VERIFY=false \
@@ -65,14 +67,14 @@ podman run --rm -p 8080:8080 \
 Acting on behalf of a user application, obtain the client ID and client secret for the user application.
 
 ```bash
-USER_AUTH_CLIENT_ID=ai4cloudops
-USER_AUTH_CLIENT_SECRET=Find the client secret for your USER_AUTH_CLIENT_ID above
+PROXY_AUTH_CLIENT_ID=ai4cloudops
+PROXY_AUTH_CLIENT_SECRET=Find the client secret for your PROXY_AUTH_CLIENT_ID above
 ```
 
 Obtain an auth token for the user application
 
 ```bash
-AUTH_TOKEN=$(curl -X POST -k -s -u "$USER_AUTH_CLIENT_ID:$USER_AUTH_CLIENT_SECRET" \
+AUTH_TOKEN=$(curl -X POST -k -s -u "$PROXY_AUTH_CLIENT_ID:$PROXY_AUTH_CLIENT_SECRET" \
   -d "grant_type=client_credentials" \
   "$PROXY_AUTH_BASE_URL/realms/$PROXY_AUTH_REALM/protocol/openid-connect/token" \
   | jq -r ".access_token")
