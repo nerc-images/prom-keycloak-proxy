@@ -198,7 +198,7 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 			log.Fatal().Err(err).Msg("failed while serving proxy")
 		}
 	}()
-	defer proxySrv.Close()
+	defer proxySrv.Close() //nolint:errcheck
 
 	signalctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	<-signalctx.Done() // Block until we've received a signal.

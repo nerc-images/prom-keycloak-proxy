@@ -147,9 +147,9 @@ func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,
 
 	response, err := client.Get(prometheusUrl)
 	if err == nil {
-		defer response.Body.Close()
+		defer response.Body.Close() //nolint:errcheck
 		var data interface{}
-		json.NewDecoder(response.Body).Decode(&data)
+		json.NewDecoder(response.Body).Decode(&data) //nolint:errcheck
 		return data, err
 	} else {
 		return nil, err

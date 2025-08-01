@@ -43,7 +43,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 
 		if len(authHeader) < 1 {
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(errors.UnauthorizedError())
+			json.NewEncoder(w).Encode(errors.UnauthorizedError()) //nolint:errcheck
 			return
 		}
 
@@ -62,7 +62,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg("Unauthorized")
 
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
+			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error())) //nolint:errcheck
 			return
 		}
 
@@ -78,7 +78,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg("Unauthorized")
 
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
+			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error())) //nolint:errcheck
 			return
 		}
 		username := *userInfo.PreferredUsername
@@ -101,7 +101,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg("Unauthorized")
 
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(errors.UnauthorizedError())
+			json.NewEncoder(w).Encode(errors.UnauthorizedError()) //nolint:errcheck
 			return
 		}
 
@@ -136,7 +136,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg(err.Error())
 
 			w.WriteHeader(403)
-			json.NewEncoder(w).Encode(errors.UnauthorizedError())
+			json.NewEncoder(w).Encode(errors.UnauthorizedError()) //nolint:errcheck
 			return
 		}
 
@@ -153,7 +153,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg("Bad Request")
 
 			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error()))
+			json.NewEncoder(w).Encode(errors.BadRequestError(err.Error())) //nolint:errcheck
 			return
 		}
 
@@ -202,10 +202,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 				Msg(message)
 
 			w.WriteHeader(403)
-			json.NewEncoder(w).Encode(errors.HttpError{
-				Code:    403,
-				Error:   "Forbidden",
-				Message: message})
+			json.NewEncoder(w).Encode(errors.HttpError{Code: 403, Error: "Forbidden", Message: message}) //nolint:errcheck
 			return
 		}
 
