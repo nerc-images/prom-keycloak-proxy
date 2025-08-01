@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 
+	"github.com/OCP-on-NERC/prom-keycloak-proxy/internal/config"
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/services"
-	"github.com/go-playground/validator/v10"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
@@ -22,27 +21,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
-
-type (
-	ProxyVars struct {
-		ProxyAcmHub             string   `validate:"required,alphanumhyphen,lowercase"`
-		ProxyAuthBaseUrl        string   `validate:"required,url"`
-		ProxyAuthClientId       string   `validate:"required,alphanumhyphen"`
-		ProxyAuthClientSecret   string   `validate:"required,ascii"`
-		ProxyAuthRealm          string   `validate:"required,alphanumhyphen"`
-		ProxyAuthTlsVerify      bool     `validate:"required"`
-		ProxyClusterKey         string   `validate:"required,alphanum"`
-		ProxyCorsAllowedOrigins []string `validate:"dive,url|eq=*"`
-		ProxyHubKey             string   `validate:"required,alphanum"`
-		ProxyProjectKey         string   `validate:"required,alphanum"`
-		ProxyPrometheusBaseUrl  string   `validate:"required,url,startswith=http:|startswith=https:"`
-		ProxyPrometheusCaCrt    string   `validate:"required,filepath"`
-		ProxyPrometheusTlsCert  string   `validate:"required,filepath"`
-		ProxyPrometheusTlsKey   string   `validate:"required,filepath"`
-	}
-)
-
-var validate *validator.Validate
 
 func must(action string, err error) {
 	if err != nil {
@@ -106,64 +84,39 @@ func main() {
 	}
 }
 
-func ValidateAlphanumericWithHyphen(fl validator.FieldLevel) bool {
-	//  Regex to match alphanumeric characters and hyphens
-	regex := regexp.MustCompile("^[a-zA-Z0-9-]+$")
-	return regex.MatchString(fl.Field().String())
-}
-
 func rootRunE(cmd *cobra.Command, args []string) error {
-	validate = validator.New(validator.WithRequiredStructEnabled())
-	must("register alphanumhyphen validator", validate.RegisterValidation("alphanumhyphen", ValidateAlphanumericWithHyphen))
-
-	vars := &ProxyVars{
-		ProxyAcmHub:             viper.GetString("proxy-acm-hub"),
-		ProxyAuthBaseUrl:        viper.GetString("proxy-auth-base-url"),
-		ProxyAuthClientId:       viper.GetString("proxy-auth-client-id"),
-		ProxyAuthClientSecret:   viper.GetString("proxy-auth-client-secret"),
-		ProxyAuthRealm:          viper.GetString("proxy-auth-realm"),
-		ProxyAuthTlsVerify:      viper.GetBool("proxy-auth-tls-verify"),
-		ProxyCorsAllowedOrigins: viper.GetStringSlice("proxy-cors-allowed-origins"),
-		ProxyClusterKey:         viper.GetString("proxy-cluster-key"),
-		ProxyHubKey:             viper.GetString("proxy-hub-key"),
-		ProxyProjectKey:         viper.GetString("proxy-project-key"),
-		ProxyPrometheusBaseUrl:  viper.GetString("proxy-prometheus-base-url"),
-		ProxyPrometheusCaCrt:    viper.GetString("proxy-prometheus-ca-crt"),
-		ProxyPrometheusTlsCert:  viper.GetString("proxy-prometheus-tls-crt"),
-		ProxyPrometheusTlsKey:   viper.GetString("proxy-prometheus-tls-key"),
-	}
-	validation_error := validate.Struct(vars)
-	if validation_error != nil {
-		return fmt.Errorf("validating the configuration failed: %w", validation_error)
+	cfg := config.BuildFromViper(viper.GetViper())
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("validating configuration: %w", err)
 	}
 
-	gocloakClient := services.InitializeOauthServer(vars.ProxyAuthBaseUrl, vars.ProxyAuthTlsVerify)
+	gocloakClient := services.InitializeOauthServer(cfg.AuthBaseUrl, cfg.AuthTlsVerify)
 
 	const proxyPrefix = "proxy"
 	proxySrv := cobrautil.HTTPServerFromFlags(cmd, proxyPrefix)
 	proxySrv.Handler = logHandler(cors.New(cors.Options{
-		AllowedOrigins:   cobrautil.MustGetStringSlice(cmd, "proxy-cors-allowed-origins"),
+		AllowedOrigins:   cfg.CorsAllowedOrigins,
 		AllowCredentials: true,
 		AllowedHeaders:   []string{"Authorization"},
 		Debug:            log.Debug().Enabled(),
 	}).Handler(
 		services.Protect(
-			vars.ProxyHubKey,
-			vars.ProxyClusterKey,
-			vars.ProxyProjectKey,
+			cfg.HubKey,
+			cfg.ClusterKey,
+			cfg.ProjectKey,
 			gocloakClient,
-			vars.ProxyAuthRealm,
-			vars.ProxyAuthClientId,
-			vars.ProxyAuthClientSecret,
-			vars.ProxyAcmHub,
+			cfg.AuthRealm,
+			cfg.AuthClientId,
+			cfg.AuthClientSecret,
+			cfg.AcmHub,
 			services.PromQueryHandler(
 				gocloakClient,
-				vars.ProxyAuthRealm,
-				vars.ProxyAuthClientId,
-				vars.ProxyPrometheusBaseUrl,
-				vars.ProxyPrometheusTlsCert,
-				vars.ProxyPrometheusTlsKey,
-				vars.ProxyPrometheusCaCrt))))
+				cfg.AuthRealm,
+				cfg.AuthClientId,
+				cfg.PrometheusBaseUrl,
+				cfg.PrometheusTlsCert,
+				cfg.PrometheusTlsKey,
+				cfg.PrometheusCaCrt))))
 	go func() {
 		if err := cobrautil.HTTPListenFromFlags(cmd, proxyPrefix, proxySrv, zerolog.InfoLevel); err != nil {
 			log.Fatal().Err(err).Msg("failed while serving proxy")
