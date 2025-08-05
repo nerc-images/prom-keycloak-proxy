@@ -17,7 +17,6 @@ import (
 func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, prometheusBaseUrl string, prometheusTlsCertPath string, prometheusTlsKeyPath string, prometheusCaCertPath string) http.HandlerFunc {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-
 			queryValues := r.URL.Query()
 			matchers := queryValues[queries.QueryParam]
 			for _, matcher := range matchers {
@@ -28,7 +27,7 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 
 			data, err := queries.QueryPrometheus(prometheusTlsCertPath, prometheusTlsKeyPath, prometheusCaCertPath, prometheusUrl)
 			if err == nil {
-				json.NewEncoder(w).Encode(&data)
+				json.NewEncoder(w).Encode(&data) //nolint:errcheck
 			} else {
 				log.Err(err).
 					Int("status", 200).
@@ -39,7 +38,7 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 					Str("query", r.URL.RawQuery).
 					Msg("")
 				data := new(errors.HttpError)
-				json.NewEncoder(w).Encode(&data)
+				json.NewEncoder(w).Encode(&data) //nolint:errcheck
 			}
 		})
 }

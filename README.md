@@ -7,8 +7,7 @@ secured by Keycloak Fine-Grained Resource Permissions.
 ### Install the prerequiste packages for buildah and podman
 
 ```bash
-pkcon install -y buildah
-pkcon install -y podman
+pkcon install -y buildah podman
 ```
 
 ### Build the container with podman
@@ -126,3 +125,49 @@ Content-Type: text/plain; charset=utf-8
 ```
 
 You can use the [Test API Jupyter Notebook](doc/test-api.ipynb) to help you test your prom-keycloak-proxy API.
+
+## Contributing
+
+## Setting up your development environment
+
+There are automated workflows that performing linting and tests for all pull requests submitted to this project. In order to have the smoothest experience possible when contributing code, you'll want to perform the same tests locally before opening a pull request.
+
+### Install pre-commit hook to run golangci-lint
+
+We use [golangci-lint](https://github.com/golangci/golangci-lint) to check the code in this project. The golangci project [recommends] installing a binary release:
+
+[recommends]: https://golangci-lint.run/welcome/install/#install-from-sources
+
+1. Go to <https://github.com/golangci/golangci-lint/releases/latest>
+2. Download the appropriate binary release for your platform
+3. Install it somewhere in your `$PATH`. The following GNU-tar command would install the `golangci-lint` command in `$HOME/bin`:
+
+    ```
+    tar -C ~/bin --strip-components=1 -xf golangci-lint-2.3.1-linux-amd64.tar.gz '*/golangci-lint'
+    ```
+    
+    The above command is appropriate for Linux on x86_64 systems. Modify the release pattern as necessary for other platforms.
+
+Finally, add a [`pre-commit` hook](https://git-scm.com/book/ms/v2/Customizing-Git-Git-Hooks) that runs `golangci-lint` whenever you make a commit:
+
+```
+cat > .git/hooks/pre-commit <<EOF
+#!/bin/sh
+
+exec golangci-lint run --fix
+EOF
+chmod 755 .git/hooks/pre-commit
+```
+
+### Install pre-push hook to run unit tests
+
+It's a good idea to make sure all the unit tests are passing before you open a pull request. You can arrange to run these tests before pushing changes to a remote repository by creating a `pre-push` hook:
+
+```
+cat > .git/hooks/pre-push <<EOF
+#!/bin/sh
+
+exec go test ./...
+EOF
+chmod 755 .git/hooks/pre-commit
+```

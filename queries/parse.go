@@ -105,7 +105,6 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 	cluster, _ := AppendMatcher(queryValues, queryValuesForAuth, "cluster", fmt.Sprintf("%s-%s-%s", hubKey, hub, clusterKey), "")
 
 	if cluster != "" {
-
 		authResourceNames = append(authResourceNames, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, cluster))
 		authScopeNames = append(authScopeNames, "GET")
 
@@ -113,7 +112,6 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 		namespace, _ := AppendMatcher(queryValues, queryValuesForAuth, "namespace", fmt.Sprintf("%s-%s-%s-%s-%s", hubKey, hub, clusterKey, cluster, projectKey), exported_namespace)
 
 		if namespace != "" {
-
 			if cluster != "" {
 				authResourceNames = append(authResourceNames, fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, cluster, projectKey, namespace))
 				authScopeNames = append(authScopeNames, "GET")
@@ -126,7 +124,6 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 
 func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,
 	prometheusCaCertPath string, prometheusUrl string) (interface{}, error) {
-
 	prometheusCaCert, err := os.ReadFile(prometheusCaCertPath)
 	if err != nil {
 		log.Panic(err)
@@ -150,9 +147,9 @@ func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,
 
 	response, err := client.Get(prometheusUrl)
 	if err == nil {
-		defer response.Body.Close()
+		defer response.Body.Close() //nolint:errcheck
 		var data interface{}
-		json.NewDecoder(response.Body).Decode(&data)
+		json.NewDecoder(response.Body).Decode(&data) //nolint:errcheck
 		return data, err
 	} else {
 		return nil, err

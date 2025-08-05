@@ -18,18 +18,6 @@ type filteredWriter struct {
 // Compile-time assert that filteredWriter implements http.ResponseWriter.
 var _ http.ResponseWriter = (*filteredWriter)(nil)
 
-func newFilteredWriter(w http.ResponseWriter, reservedResponseHeaders ...string) *filteredWriter {
-	savedHeaders := make(map[string][]string, len(reservedResponseHeaders))
-	for _, name := range reservedResponseHeaders {
-		savedHeaders[name] = w.Header().Values(name)
-	}
-
-	return &filteredWriter{
-		ResponseWriter: w,
-		savedHeaders:   savedHeaders,
-	}
-}
-
 func (w filteredWriter) resetHeaders() {
 	for name := range w.savedHeaders {
 		w.ResponseWriter.Header().Del(name)

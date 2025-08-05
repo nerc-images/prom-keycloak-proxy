@@ -1,0 +1,25 @@
+name: Test
+
+on:
+  pull_request:
+
+jobs:
+  # Standard unit tests that run on GitHub's hosted runners
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+    
+    - name: Run unit tests
+      run: go test -coverprofile=coverage.out ./...
+    
+    - name: Show test coverage
+      run: |
+        go tool cover -func=coverage.out
