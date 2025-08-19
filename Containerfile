@@ -17,6 +17,7 @@ RUN go mod download
 COPY *.go ./
 COPY domains/ domains/
 COPY errors/ errors/
+COPY internal/ internal/
 COPY queries/ queries/
 COPY services/ services/
 RUN CGO_ENABLED=0 GOOS=linux go build -o /prom-keycloak-proxy

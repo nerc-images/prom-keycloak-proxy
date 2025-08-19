@@ -29,7 +29,8 @@ podman push nerc-images/prom-keycloak-proxy:latest quay.io/nerc-images/prom-keyc
 Obtain the Keycloak admin password in the `keycloak-initial-admin` Secret.
 
 ```bash
-PROXY_AUTH_BASE_URL=https://keycloak.apps-crc.testing
+PROXY_AUTH_BASE_URL=https://keycloak.apps.obs.nerc.mghpcc.org
+PROXY_PROMETHEUS_BASE_URL=https://observatorium-api-open-cluster-management-observability.apps.infra.nerc.mghpcc.org/api/metrics/v1/default
 PROXY_ACM_HUB=moc
 PROXY_AUTH_REALM=NERC
 PROXY_AUTH_CLIENT_ID=ai-telemetry
@@ -53,11 +54,14 @@ podman run --rm -p 8080:8080 \
   -e PROXY_ACM_HUB=$PROXY_ACM_HUB \
   -e PROXY_AUTH_REALM=$PROXY_AUTH_REALM \
   -e PROXY_AUTH_BASE_URL=$PROXY_AUTH_BASE_URL \
-  -e PROXY_AUTH_TLS_VERIFY=false \
-  -e PROXY_PROMETHEUS_BASE_URL=https://observatorium-api-open-cluster-management-observability.apps.example.com/api/metrics/v1/default \
+  -e PROXY_AUTH_TLS_VERIFY=true \
+  -e PROXY_PROMETHEUS_BASE_URL=$PROXY_PROMETHEUS_BASE_URL \
   -e PROXY_PROMETHEUS_CA_CRT=/opt/Downloads/ca.crt \
   -e PROXY_PROMETHEUS_TLS_CRT=/opt/Downloads/tls.crt \
   -e PROXY_PROMETHEUS_TLS_KEY=/opt/Downloads/tls.key \
+  -e PROXY_HUB_KEY=HUB \
+  -e PROXY_CLUSTER_KEY=CLUSTER \
+  -e PROXY_PROJECT_KEY=PROJECT \
   -v /home/ctate/Downloads:/opt/Downloads \
   --privileged \
   nerc-images/prom-keycloak-proxy:latest
