@@ -76,7 +76,6 @@ func main() {
 	registerStringFlag(flags, "proxy-project-key", "", "The project key to use for auth resources")
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.SetEnvPrefix("PROM_KEYCLOAK_PROXY")
 	viper.AutomaticEnv()
 
 	if err := rootCmd.Execute(); err != nil {
