@@ -62,7 +62,7 @@ podman run --rm -p 8080:8080 \
   -e PROXY_HUB_KEY=HUB \
   -e PROXY_CLUSTER_KEY=CLUSTER \
   -e PROXY_PROJECT_KEY=PROJECT \
-  -v /home/ctate/Downloads:/opt/Downloads \
+  -v $HOME/Downloads:/opt/Downloads \
   --privileged \
   nerc-images/prom-keycloak-proxy:latest
 ```
@@ -127,6 +127,40 @@ Content-Type: text/plain; charset=utf-8
 
 {"code":401,"error":"Unauthorized","message":"You are not authorized to access this resource"}
 ```
+
+The only regex operation it supports for authorization is the "|" operator. Use it to query metrics from different clusters and namespaces.
+
+```bash
+curl -i 'http://localhost:8080/api/v1/query' --get \
+  --data-urlencode 'query=cluster:cpu_cores:sum{cluster=~"nerc-ocp-prod|nerc-ocp-test"}' \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AUTH_TOKEN"
+```
+
+If the user is authorized to access both cluster's metrics, you will see a successful response.
+
+```bash
+HTTP/1.1 200 OK
+Vary: Origin
+Date: Wed, 08 May 2024 16:44:35 GMT
+Content-Length: 196
+Content-Type: text/plain; charset=utf-8
+
+{"data":{"result":[{"metric":{"__name__":"cluster:cpu_cores:sum","cluster":"nerc-ocp-prod","usage":"grafana-dashboard"},"value":[...]},{"metric":{"__name__":"cluster:cpu_cores:sum","cluster":"nerc-ocp-test","usage":"grafana-dashboard"},"value":[...]}],"resultType":"vector"},"status":"success"}
+```
+
+If the user is not authorized to access at least one requested metric, you will see a failed response.
+
+```bash
+HTTP/1.1 403 Forbidden
+Vary: Origin
+Date: Wed, 08 May 2024 16:47:24 GMT
+Content-Length: 95
+Content-Type: text/plain; charset=utf-8
+
+{"code":401,"error":"Unauthorized","message":"You are not authorized to access this resource"}
+```
+
 
 You can use the [Test API Jupyter Notebook](doc/test-api.ipynb) to help you test your prom-keycloak-proxy API.
 
