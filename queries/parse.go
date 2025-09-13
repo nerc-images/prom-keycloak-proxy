@@ -106,43 +106,44 @@ func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key st
 //
 // Returns:
 //   - [][][]string: A 3D slice where:
-//     - First dimension: Each matcher/selector in the query (one for each curly bracket pair {})
-//     - Second dimension: A list of resource names that the client must have all permissions for in Keycloak order to submit the query
-//     - Third dimension: Individual resource name
+//   - First dimension: Each matcher/selector in the query (one for each curly bracket pair {})
+//   - Second dimension: A list of resource names that the client must have all permissions for in Keycloak order to submit the query
+//   - Third dimension: Individual resource name
 //   - []string: List of all unique required permissions with the "GET" keycloak scope appended
 //
 // Example:
-//   Query: sum(metric1{cluster=~"c1|c2",namespace=~"n1|n2"}) + sum(metric2{cluster="c3",exported_namespace="n3",namespace="n4"})
-//   Returns:
-//   [][][]string {
-//     {
-//       {HUB},
-//       {HUB-hub},
-//       {HUB-hub-CLUSTER-c1, HUB-hub-CLUSTER-c2},
-//       {HUB-hub-CLUSTER-c1-PROJECT-n1, HUB-hub-CLUSTER-c1-PROJECT-n2, HUB-hub-CLUSTER-c2},
-//       {HUB-hub-CLUSTER-c1, HUB-hub-CLUSTER-c2-PROJECT-n1, HUB-hub-CLUSTER-c2-PROJECT-n2},
-//       {HUB-hub-CLUSTER-c1-PROJECT-n1, HUB-hub-CLUSTER-c1-PROJECT-n2, HUB-hub-CLUSTER-c2-PROJECT-n1, HUB-hub-CLUSTER-c2-PROJECT-n2},
-//     },
-//     {
-//       {HUB},
-//       {HUB-hub},
-//       {HUB-hub-CLUSTER-c3},
-//       {HUB-hub-CLUSTER-c3-PROJECT-n3, HUB-hub-CLUSTER-c3-PROJECT-n4},
-//     },
-//   },
-//   []string {
-//     HUB,
-//     HUB-hub,
-//     HUB-hub-CLUSTER-c1,
-//     HUB-hub-CLUSTER-c1-PROJECT-n1,
-//     HUB-hub-CLUSTER-c1-PROJECT-n2,
-//     HUB-hub-CLUSTER-c2,
-//     HUB-hub-CLUSTER-c2-PROJECT-n1,
-//     HUB-hub-CLUSTER-c2-PROJECT-n2,
-//     HUB-hub-CLUSTER-c3,
-//     HUB-hub-CLUSTER-c3-PROJECT-n3,
-//     HUB-hub-CLUSTER-c3-PROJECT-n4,
-//   }
+//
+//	Query: sum(metric1{cluster=~"c1|c2",namespace=~"n1|n2"}) + sum(metric2{cluster="c3",exported_namespace="n3",namespace="n4"})
+//	Returns:
+//	[][][]string {
+//	  {
+//	    {HUB},
+//	    {HUB-hub},
+//	    {HUB-hub-CLUSTER-c1, HUB-hub-CLUSTER-c2},
+//	    {HUB-hub-CLUSTER-c1-PROJECT-n1, HUB-hub-CLUSTER-c1-PROJECT-n2, HUB-hub-CLUSTER-c2},
+//	    {HUB-hub-CLUSTER-c1, HUB-hub-CLUSTER-c2-PROJECT-n1, HUB-hub-CLUSTER-c2-PROJECT-n2},
+//	    {HUB-hub-CLUSTER-c1-PROJECT-n1, HUB-hub-CLUSTER-c1-PROJECT-n2, HUB-hub-CLUSTER-c2-PROJECT-n1, HUB-hub-CLUSTER-c2-PROJECT-n2},
+//	  },
+//	  {
+//	    {HUB},
+//	    {HUB-hub},
+//	    {HUB-hub-CLUSTER-c3},
+//	    {HUB-hub-CLUSTER-c3-PROJECT-n3, HUB-hub-CLUSTER-c3-PROJECT-n4},
+//	  },
+//	},
+//	[]string {
+//	  HUB,
+//	  HUB-hub,
+//	  HUB-hub-CLUSTER-c1,
+//	  HUB-hub-CLUSTER-c1-PROJECT-n1,
+//	  HUB-hub-CLUSTER-c1-PROJECT-n2,
+//	  HUB-hub-CLUSTER-c2,
+//	  HUB-hub-CLUSTER-c2-PROJECT-n1,
+//	  HUB-hub-CLUSTER-c2-PROJECT-n2,
+//	  HUB-hub-CLUSTER-c3,
+//	  HUB-hub-CLUSTER-c3-PROJECT-n3,
+//	  HUB-hub-CLUSTER-c3-PROJECT-n4,
+//	}
 func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hub string, promqlQuery string) ([][][]string, []string) {
 	expr, exprErr := parser.ParseExpr(promqlQuery)
 	if exprErr != nil {
@@ -151,16 +152,16 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 
 	matchers := parser.ExtractSelectors(expr)
 	if len(matchers) == 0 {
-		return [][][]string {
-			{
-				{hubKey},
-				{fmt.Sprintf("%s-%s", hubKey, hub)},
+		return [][][]string{
+				{
+					{hubKey},
+					{fmt.Sprintf("%s-%s", hubKey, hub)},
+				},
 			},
-		}, 
-		[]string {
-			hubKey + "#GET",
-			fmt.Sprintf("%s-%s#GET", hubKey, hub),
-		}
+			[]string{
+				hubKey + "#GET",
+				fmt.Sprintf("%s-%s#GET", hubKey, hub),
+			}
 	}
 
 	resources := make([][][]string, len(matchers))
@@ -246,7 +247,7 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 		for combinationBitMap = 0; combinationBitMap < totalCombinations; combinationBitMap++ {
 			var namespaceResources []string
 			for bitOffset, clusterValue := range clusterValues {
-				if (combinationBitMap >> bitOffset) & 1 == 0 {
+				if (combinationBitMap>>bitOffset)&1 == 0 {
 					namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue))
 					uniqueResources[fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue)] = struct{}{}
 				} else {
