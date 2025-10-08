@@ -89,7 +89,7 @@ func NewProxyConfig(tempDir string, opts ...ProxyConfigOption) *ProxyConfig {
 		ProjectKey:         "projectkey123",
 		PrometheusBaseUrl:  "https://prometheus.example.com",
 		PrometheusCaCrt:    filepath.Join(tempDir, "ca.crt"),
-		PrometheusTlsCert:  filepath.Join(tempDir, "tls.crt"),
+		PrometheusTlsCrt:   filepath.Join(tempDir, "tls.crt"),
 		PrometheusTlsKey:   filepath.Join(tempDir, "tls.key"),
 	}
 
@@ -157,8 +157,8 @@ func WithPrometheusCaCrt(value string) ProxyConfigOption {
 	return func(c *ProxyConfig) { c.PrometheusCaCrt = value }
 }
 
-func WithPrometheusTlsCert(value string) ProxyConfigOption {
-	return func(c *ProxyConfig) { c.PrometheusTlsCert = value }
+func WithPrometheusTlsCrt(value string) ProxyConfigOption {
+	return func(c *ProxyConfig) { c.PrometheusTlsCrt = value }
 }
 
 func WithPrometheusTlsKey(value string) ProxyConfigOption {
@@ -250,7 +250,7 @@ func TestProxyConfig_Validate(t *testing.T) {
 		},
 		{
 			name:    "missing tls certificate file",
-			config:  NewProxyConfig(tempDir, WithPrometheusTlsCert("/nonexistent/tls.crt")),
+			config:  NewProxyConfig(tempDir, WithPrometheusTlsCrt("/nonexistent/tls.crt")),
 			wantErr: true,
 			errMsg:  "file",
 		},
@@ -307,7 +307,7 @@ func TestBuildFromViper(t *testing.T) {
 				assert.Equal(t, "projectkey123", cfg.ProjectKey)
 				assert.Equal(t, "https://prometheus.example.com", cfg.PrometheusBaseUrl)
 				assert.Equal(t, "/path/to/ca.crt", cfg.PrometheusCaCrt)
-				assert.Equal(t, "/path/to/tls.crt", cfg.PrometheusTlsCert)
+				assert.Equal(t, "/path/to/tls.crt", cfg.PrometheusTlsCrt)
 				assert.Equal(t, "/path/to/tls.key", cfg.PrometheusTlsKey)
 			},
 		},

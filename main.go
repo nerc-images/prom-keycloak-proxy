@@ -113,9 +113,11 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 				cfg.AuthRealm,
 				cfg.AuthClientId,
 				cfg.PrometheusBaseUrl,
-				cfg.PrometheusTlsCert,
+				cfg.PrometheusTlsCrt,
 				cfg.PrometheusTlsKey,
-				cfg.PrometheusCaCrt))))
+				cfg.PrometheusCaCrt,
+				cfg.PrometheusToken,
+				cfg.AuthTlsVerify))))
 	go func() {
 		if err := cobrautil.HTTPListenFromFlags(cmd, proxyPrefix, proxySrv, zerolog.InfoLevel); err != nil {
 			log.Fatal().Err(err).Msg("failed while serving proxy")

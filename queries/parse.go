@@ -274,29 +274,52 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 }
 
 func QueryPrometheus(prometheusTlsCertPath string, prometheusTlsKeyPath string,
-	prometheusCaCertPath string, prometheusUrl string) (interface{}, error) {
-	prometheusCaCert, err := os.ReadFile(prometheusCaCertPath)
-	if err != nil {
-		log.Panic(err)
-	}
+	prometheusCaCertPath string, prometheusToken string, authTlsVerify bool, prometheusUrl string) (interface{}, error) {
+	var client *http.Client
+	if prometheusTlsCertPath != "" && prometheusTlsKeyPath != "" && prometheusCaCertPath != "" {
+		prometheusCaCert, err := os.ReadFile(prometheusCaCertPath)
+		if err != nil {
+			log.Panic(err)
+		}
 
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(prometheusCaCert)
-	cert, err := tls.LoadX509KeyPair(prometheusTlsCertPath, prometheusTlsKeyPath)
-	if err != nil {
-		log.Panic(err)
-	}
+		var caCertPool *x509.CertPool
+		var cert tls.Certificate
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:      caCertPool,
-				Certificates: []tls.Certificate{cert},
+		caCertPool = x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(prometheusCaCert)
+		cert, err = tls.LoadX509KeyPair(prometheusTlsCertPath, prometheusTlsKeyPath)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:            caCertPool,
+					Certificates:       []tls.Certificate{cert},
+					InsecureSkipVerify: !authTlsVerify,
+				},
 			},
-		},
+		}
+	} else {
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: !authTlsVerify,
+				},
+			},
+		}
 	}
 
-	response, err := client.Get(prometheusUrl)
+	req, err := http.NewRequest(http.MethodGet, prometheusUrl, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+	if prometheusToken != "" {
+		req.Header.Add("Authorization", "Bearer "+prometheusToken)
+	}
+
+	response, err := client.Do(req)
 	if err == nil {
 		defer response.Body.Close() //nolint:errcheck
 		var data interface{}
