@@ -211,7 +211,9 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 			} else {
 				namespaces := strings.Split(exportedNamespaceMatcher.Value, "|")
 				for _, namespace := range namespaces {
-					namespaceValues = append(namespaceValues, regexp.QuoteMeta(namespace))
+					if exportedNamespaceMatcher.Type != labels.MatchNotEqual || exportedNamespaceMatcher.Value != "" {
+						namespaceValues = append(namespaceValues, regexp.QuoteMeta(namespace))
+					}
 				}
 			}
 		}
@@ -221,7 +223,9 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 			} else {
 				namespaces := strings.Split(namespaceMatcher.Value, "|")
 				for _, namespace := range namespaces {
-					namespaceValues = append(namespaceValues, regexp.QuoteMeta(namespace))
+					if namespaceMatcher.Type != labels.MatchNotEqual || namespaceMatcher.Value != "" {
+						namespaceValues = append(namespaceValues, regexp.QuoteMeta(namespace))
+					}
 				}
 			}
 		}
