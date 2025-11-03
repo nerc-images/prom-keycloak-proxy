@@ -20,8 +20,8 @@ type ProxyConfig struct {
 	HubKey             string   `validate:"required,alphanum"`
 	ProjectKey         string   `validate:"required,alphanum"`
 	PrometheusBaseUrl  string   `validate:"required,url,startswith=http:|startswith=https:"`
-	PrometheusCaCrt    string   `validate:"omitempty,file"`
-	PrometheusTlsCrt   string   `validate:"omitempty,file"`
+	PrometheusCaCert   string   `validate:"omitempty,file"`
+	PrometheusTlsCert  string   `validate:"omitempty,file"`
 	PrometheusTlsKey   string   `validate:"omitempty,file"`
 	PrometheusToken    string   `validate:"omitempty,ascii"`
 }
@@ -60,8 +60,8 @@ func BuildFromViper(v ViperInterface) *ProxyConfig {
 		HubKey:             v.GetString("proxy-hub-key"),
 		ProjectKey:         v.GetString("proxy-project-key"),
 		PrometheusBaseUrl:  v.GetString("proxy-prometheus-base-url"),
-		PrometheusCaCrt:    v.GetString("proxy-prometheus-ca-crt"),
-		PrometheusTlsCrt:   v.GetString("proxy-prometheus-tls-crt"),
+		PrometheusCaCert:   v.GetString("proxy-prometheus-ca-cert"),
+		PrometheusTlsCert:  v.GetString("proxy-prometheus-tls-cert"),
 		PrometheusTlsKey:   v.GetString("proxy-prometheus-tls-key"),
 		PrometheusToken:    v.GetString("proxy-prometheus-token"),
 	}
