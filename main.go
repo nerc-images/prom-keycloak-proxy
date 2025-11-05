@@ -68,9 +68,9 @@ func main() {
 	registerStringFlag(flags, "proxy-auth-base-url", "", "Keycloak base URL")
 	registerBoolFlag(flags, "proxy-auth-tls-verify", true, "connect to keycloak and verify valid TLS")
 	registerStringFlag(flags, "proxy-prometheus-base-url", "", "address of the prometheus to use for checking")
-	registerStringFlag(flags, "proxy-prometheus-tls-crt", "", "path at which to find a certificate for prometheus TLS")
+	registerStringFlag(flags, "proxy-prometheus-tls-cert", "", "path at which to find a certificate for prometheus TLS")
 	registerStringFlag(flags, "proxy-prometheus-tls-key", "", "path at which to find a private key for prometheus TLS")
-	registerStringFlag(flags, "proxy-prometheus-ca-crt", "", "path at which to find a ca certificate for prometheus TLS")
+	registerStringFlag(flags, "proxy-prometheus-ca-cert", "", "path at which to find a ca certificate for prometheus TLS")
 	registerStringFlag(flags, "proxy-hub-key", "", "The hub key to use for auth resources")
 	registerStringFlag(flags, "proxy-cluster-key", "", "The cluster key to use for auth resources")
 	registerStringFlag(flags, "proxy-project-key", "", "The project key to use for auth resources")
@@ -115,7 +115,9 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 				cfg.PrometheusBaseUrl,
 				cfg.PrometheusTlsCert,
 				cfg.PrometheusTlsKey,
-				cfg.PrometheusCaCrt))))
+				cfg.PrometheusCaCert,
+				cfg.PrometheusToken,
+				cfg.AuthTlsVerify))))
 	go func() {
 		if err := cobrautil.HTTPListenFromFlags(cmd, proxyPrefix, proxySrv, zerolog.InfoLevel); err != nil {
 			log.Fatal().Err(err).Msg("failed while serving proxy")

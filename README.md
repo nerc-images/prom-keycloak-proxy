@@ -56,8 +56,8 @@ podman run --rm -p 8080:8080 \
   -e PROXY_AUTH_BASE_URL=$PROXY_AUTH_BASE_URL \
   -e PROXY_AUTH_TLS_VERIFY=true \
   -e PROXY_PROMETHEUS_BASE_URL=$PROXY_PROMETHEUS_BASE_URL \
-  -e PROXY_PROMETHEUS_CA_CRT=/opt/Downloads/ca.crt \
-  -e PROXY_PROMETHEUS_TLS_CRT=/opt/Downloads/tls.crt \
+  -e PROXY_PROMETHEUS_CA_CERT=/opt/Downloads/ca.crt \
+  -e PROXY_PROMETHEUS_TLS_CERT=/opt/Downloads/tls.crt \
   -e PROXY_PROMETHEUS_TLS_KEY=/opt/Downloads/tls.key \
   -e PROXY_HUB_KEY=HUB \
   -e PROXY_CLUSTER_KEY=CLUSTER \

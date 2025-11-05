@@ -66,8 +66,8 @@ func validMockViper() *mockViper {
 		setString("proxy-hub-key", "hubkey123").
 		setString("proxy-project-key", "projectkey123").
 		setString("proxy-prometheus-base-url", "https://prometheus.example.com").
-		setString("proxy-prometheus-ca-crt", "/path/to/ca.crt").
-		setString("proxy-prometheus-tls-crt", "/path/to/tls.crt").
+		setString("proxy-prometheus-ca-cert", "/path/to/ca.crt").
+		setString("proxy-prometheus-tls-cert", "/path/to/tls.crt").
 		setString("proxy-prometheus-tls-key", "/path/to/tls.key")
 }
 
@@ -88,7 +88,7 @@ func NewProxyConfig(tempDir string, opts ...ProxyConfigOption) *ProxyConfig {
 		HubKey:             "hubkey123",
 		ProjectKey:         "projectkey123",
 		PrometheusBaseUrl:  "https://prometheus.example.com",
-		PrometheusCaCrt:    filepath.Join(tempDir, "ca.crt"),
+		PrometheusCaCert:   filepath.Join(tempDir, "ca.crt"),
 		PrometheusTlsCert:  filepath.Join(tempDir, "tls.crt"),
 		PrometheusTlsKey:   filepath.Join(tempDir, "tls.key"),
 	}
@@ -153,8 +153,8 @@ func WithPrometheusBaseUrl(value string) ProxyConfigOption {
 	return func(c *ProxyConfig) { c.PrometheusBaseUrl = value }
 }
 
-func WithPrometheusCaCrt(value string) ProxyConfigOption {
-	return func(c *ProxyConfig) { c.PrometheusCaCrt = value }
+func WithPrometheusCaCert(value string) ProxyConfigOption {
+	return func(c *ProxyConfig) { c.PrometheusCaCert = value }
 }
 
 func WithPrometheusTlsCert(value string) ProxyConfigOption {
@@ -244,7 +244,7 @@ func TestProxyConfig_Validate(t *testing.T) {
 		},
 		{
 			name:    "missing ca certificate file",
-			config:  NewProxyConfig(tempDir, WithPrometheusCaCrt("/nonexistent/ca.crt")),
+			config:  NewProxyConfig(tempDir, WithPrometheusCaCert("/nonexistent/ca.crt")),
 			wantErr: true,
 			errMsg:  "file",
 		},
@@ -262,7 +262,7 @@ func TestProxyConfig_Validate(t *testing.T) {
 		},
 		{
 			name:    "directory instead of file for ca cert",
-			config:  NewProxyConfig(tempDir, WithPrometheusCaCrt(tempDir)),
+			config:  NewProxyConfig(tempDir, WithPrometheusCaCert(tempDir)),
 			wantErr: true,
 			errMsg:  "file",
 		},
@@ -306,7 +306,7 @@ func TestBuildFromViper(t *testing.T) {
 				assert.Equal(t, "hubkey123", cfg.HubKey)
 				assert.Equal(t, "projectkey123", cfg.ProjectKey)
 				assert.Equal(t, "https://prometheus.example.com", cfg.PrometheusBaseUrl)
-				assert.Equal(t, "/path/to/ca.crt", cfg.PrometheusCaCrt)
+				assert.Equal(t, "/path/to/ca.crt", cfg.PrometheusCaCert)
 				assert.Equal(t, "/path/to/tls.crt", cfg.PrometheusTlsCert)
 				assert.Equal(t, "/path/to/tls.key", cfg.PrometheusTlsKey)
 			},
@@ -345,8 +345,8 @@ func TestProxyConfig_ValidateIntegration(t *testing.T) {
 	assert.NoError(t, err)
 
 	viper := validMockViper().
-		setString("proxy-prometheus-ca-crt", caCrtFile).
-		setString("proxy-prometheus-tls-crt", tlsCrtFile).
+		setString("proxy-prometheus-ca-cert", caCrtFile).
+		setString("proxy-prometheus-tls-cert", tlsCrtFile).
 		setString("proxy-prometheus-tls-key", tlsKeyFile)
 	cfg := BuildFromViper(viper)
 

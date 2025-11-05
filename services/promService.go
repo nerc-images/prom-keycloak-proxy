@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, prometheusBaseUrl string, prometheusTlsCertPath string, prometheusTlsKeyPath string, prometheusCaCertPath string) http.HandlerFunc {
+func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, prometheusBaseUrl string, prometheusTlsCertPath string, prometheusTlsKeyPath string, prometheusCaCertPath string, prometheusToken string, authTlsVerify bool) http.HandlerFunc {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			queryValues := r.URL.Query()
@@ -25,7 +25,7 @@ func PromQueryHandler(gocloakClient *gocloak.GoCloak, authRealm string, authClie
 			}
 			prometheusUrl := prometheusBaseUrl + r.URL.Path + "?" + queryValues.Encode()
 
-			data, err := queries.QueryPrometheus(prometheusTlsCertPath, prometheusTlsKeyPath, prometheusCaCertPath, prometheusUrl)
+			data, err := queries.QueryPrometheus(prometheusTlsCertPath, prometheusTlsKeyPath, prometheusCaCertPath, prometheusToken, authTlsVerify, prometheusUrl)
 			if err == nil {
 				json.NewEncoder(w).Encode(&data) //nolint:errcheck
 			} else {
