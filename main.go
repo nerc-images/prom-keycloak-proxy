@@ -108,6 +108,7 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 			cfg.AuthClientId,
 			cfg.AuthClientSecret,
 			cfg.AcmHub,
+			cfg.OpenshiftLocal,
 			services.PromQueryHandler(
 				gocloakClient,
 				cfg.AuthRealm,
@@ -117,6 +118,7 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 				cfg.PrometheusTlsKey,
 				cfg.PrometheusCaCert,
 				cfg.PrometheusToken,
+				cfg.OpenshiftLocal,
 				cfg.AuthTlsVerify))))
 	go func() {
 		if err := cobrautil.HTTPListenFromFlags(cmd, proxyPrefix, proxySrv, zerolog.InfoLevel); err != nil {

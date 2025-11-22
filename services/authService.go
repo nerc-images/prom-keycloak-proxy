@@ -14,7 +14,6 @@ import (
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/errors"
 	"github.com/OCP-on-NERC/prom-keycloak-proxy/queries"
 
-
 	"github.com/Nerzal/gocloak/v13"
 	_ "github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
@@ -35,7 +34,7 @@ func InitializeOauthServer(authBaseUrl string, authTlsVerify bool) *gocloak.GoCl
 	return client
 }
 
-func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, proxyAcmHub string, next http.Handler) http.Handler {
+func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient *gocloak.GoCloak, authRealm string, authClientId string, authClientSecret string, proxyAcmHub string, openshiftLocal bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get(queries.QueryParam)
 
@@ -106,7 +105,7 @@ func Protect(hubKey string, clusterKey string, projectKey string, gocloakClient 
 		}
 
 		queryValues := r.URL.Query()
-		parsedResourceNameGroups, permissions := queries.ParseAuthorizations(hubKey, clusterKey, projectKey, proxyAcmHub, queryValues["query"][0])
+		parsedResourceNameGroups, permissions := queries.ParseAuthorizations(hubKey, clusterKey, projectKey, proxyAcmHub, openshiftLocal, queryValues["query"][0])
 		rpp, err := gocloakClient.GetRequestingPartyPermissions(
 			context.Background(),
 			accessToken,

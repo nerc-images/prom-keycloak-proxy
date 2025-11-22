@@ -220,8 +220,8 @@ func injectMatcher(q url.Values, matcher *labels.Matcher) error {
 }
 
 /* assisted by Claude */
-func testClusterMatch(t *testing.T, proxyAcmHub string, query string, expectedResources [][][]string, expectedPermissions []string) {
-	sliceOfResourceNames, permissions := queries.ParseAuthorizations(hubKey, clusterKey, projectKey, proxyAcmHub, query)
+func testClusterMatch(openshiftLocal bool, t *testing.T, proxyAcmHub string, query string, expectedResources [][][]string, expectedPermissions []string) {
+	sliceOfResourceNames, permissions := queries.ParseAuthorizations(hubKey, clusterKey, projectKey, proxyAcmHub, openshiftLocal, query)
 
 	// Check that we got the expected number of matchers
 	if len(sliceOfResourceNames) != len(expectedResources) {
@@ -237,7 +237,7 @@ func testClusterMatch(t *testing.T, proxyAcmHub string, query string, expectedRe
 			fmt.Println("Expected:", expectedMatcher)
 			t.Fatalf("Query %s: Matcher %d: Expected %d permutations, got %d", query, i, len(expectedMatcher), len(sliceOfResourceNames[i]))
 		}
-		
+
 		// Check each permutation
 		for j, expectedPermutation := range expectedMatcher {
 			if len(sliceOfResourceNames[i][j]) != len(expectedPermutation) {
@@ -245,7 +245,7 @@ func testClusterMatch(t *testing.T, proxyAcmHub string, query string, expectedRe
 				fmt.Println("Expected:", expectedPermutation)
 				t.Fatalf("Query %s: Matcher %d, permutation %d: Expected %d resources, got %d", query, i, j, len(expectedPermutation), len(sliceOfResourceNames[i][j]))
 			}
-			
+
 			for k, expectedResource := range expectedPermutation {
 				if sliceOfResourceNames[i][j][k] != expectedResource {
 					fmt.Println("Actual:", sliceOfResourceNames[i][j][k])
@@ -287,12 +287,11 @@ func testClusterMatch(t *testing.T, proxyAcmHub string, query string, expectedRe
 	}
 }
 
-/* Assisted by Claude */
-func TestClusterMatches(t *testing.T) {
+func TestOpenShiftLocalClusterMatches(t *testing.T) {
 	proxyAcmHub := "test-hub-1"
 
 	// Test querying metrics without any filters
-	testClusterMatch(t, proxyAcmHub, `cluster:cpu_cores:sum`,
+	testClusterMatch(true, t, proxyAcmHub, `cluster:cpu_cores:sum`,
 		[][][]string{
 			{
 				{hubKey},
@@ -306,7 +305,95 @@ func TestClusterMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with empty filter
-	testClusterMatch(t, proxyAcmHub, `cluster:cpu_cores:sum{}`,
+	testClusterMatch(true, t, proxyAcmHub, `cluster:cpu_cores:sum{}`,
+		[][][]string{
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+			},
+		},
+		[]string{
+			fmt.Sprintf("%s#GET", hubKey),
+			fmt.Sprintf("%s-%s#GET", hubKey, proxyAcmHub),
+		},
+	)
+
+	// Test querying metrics with namespace filter but no cluster filter
+	testClusterMatch(true, t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{namespace="test"}`,
+		[][][]string{
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+				{fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "test")},
+			},
+		},
+		[]string{
+			fmt.Sprintf("%s#GET", hubKey),
+			fmt.Sprintf("%s-%s#GET", hubKey, proxyAcmHub),
+			fmt.Sprintf("%s-%s-%s-%s-%s-%s#GET", hubKey, proxyAcmHub, clusterKey, "", projectKey, "test"),
+		},
+	)
+
+	// Test querying metrics with regex namespace filter
+	testClusterMatch(true, t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{namespace=~"namespace-a|namespace-b"}`,
+		[][][]string{
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+				{fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-a"), fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-b")},
+			},
+		},
+		[]string{
+			fmt.Sprintf("%s#GET", hubKey),
+			fmt.Sprintf("%s-%s#GET", hubKey, proxyAcmHub),
+			fmt.Sprintf("%s-%s-%s-%s-%s-%s#GET", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-a"),
+			fmt.Sprintf("%s-%s-%s-%s-%s-%s#GET", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-b"),
+		},
+	)
+
+	// Test more complex query querying metrics with regex namespace filter
+	testClusterMatch(true, t, proxyAcmHub, `rate(namespace:container_memory_usage_bytes:sum{namespace=~"namespace-a|namespace-b"}[1m]) + rate(namespace:container_memory_usage_bytes:sum{namespace="namespace-b"}[1m])`,
+		[][][]string{
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+				{fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-a"), fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-b")},
+			},
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+				{fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-b")},
+			},
+		},
+		[]string{
+			fmt.Sprintf("%s#GET", hubKey),
+			fmt.Sprintf("%s-%s#GET", hubKey, proxyAcmHub),
+			fmt.Sprintf("%s-%s-%s-%s-%s-%s#GET", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-a"),
+			fmt.Sprintf("%s-%s-%s-%s-%s-%s#GET", hubKey, proxyAcmHub, clusterKey, "", projectKey, "namespace-b"),
+		},
+	)
+}
+
+/* Assisted by Claude */
+func TestAcmClusterMatches(t *testing.T) {
+	proxyAcmHub := "test-hub-1"
+
+	// Test querying metrics without any filters
+	testClusterMatch(false, t, proxyAcmHub, `cluster:cpu_cores:sum`,
+		[][][]string{
+			{
+				{hubKey},
+				{fmt.Sprintf("%s-%s", hubKey, proxyAcmHub)},
+			},
+		},
+		[]string{
+			fmt.Sprintf("%s#GET", hubKey),
+			fmt.Sprintf("%s-%s#GET", hubKey, proxyAcmHub),
+		},
+	)
+
+	// Test querying metrics with empty filter
+	testClusterMatch(false, t, proxyAcmHub, `cluster:cpu_cores:sum{}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -320,7 +407,7 @@ func TestClusterMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with empty cluster filter
-	testClusterMatch(t, proxyAcmHub, `cluster:cpu_cores:sum{cluster=""}`,
+	testClusterMatch(false, t, proxyAcmHub, `cluster:cpu_cores:sum{cluster=""}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -334,7 +421,7 @@ func TestClusterMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with specific cluster filter
-	testClusterMatch(t, proxyAcmHub, `cluster:cpu_cores:sum{cluster="nerc-ocp-test"}`,
+	testClusterMatch(false, t, proxyAcmHub, `cluster:cpu_cores:sum{cluster="nerc-ocp-test"}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -350,7 +437,7 @@ func TestClusterMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with regex cluster filter
-	testClusterMatch(t, proxyAcmHub, `cluster:cpu_cores:sum{cluster=~"nerc-ocp-test|nerc-ocp-prod"}`,
+	testClusterMatch(false, t, proxyAcmHub, `cluster:cpu_cores:sum{cluster=~"nerc-ocp-test|nerc-ocp-prod"}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -367,7 +454,7 @@ func TestClusterMatches(t *testing.T) {
 	)
 
 	// Test more complex query querying metrics with regex cluster filter
-	testClusterMatch(t, proxyAcmHub, `rate(cluster:cpu_cores:sum{cluster=~"nerc-ocp-test|nerc-ocp-prod"}[5m]) + rate(cluster:cpu_cores:sum{cluster="local-cluster"}[5m])`,
+	testClusterMatch(false, t, proxyAcmHub, `rate(cluster:cpu_cores:sum{cluster=~"nerc-ocp-test|nerc-ocp-prod"}[5m]) + rate(cluster:cpu_cores:sum{cluster="local-cluster"}[5m])`,
 		[][][]string{
 			{
 				{hubKey},
@@ -391,11 +478,11 @@ func TestClusterMatches(t *testing.T) {
 }
 
 /* Assisted by Claude */
-func TestNamespaceMatches(t *testing.T) {
+func TestAcmNamespaceMatches(t *testing.T) {
 	proxyAcmHub := "test-hub-2"
 
 	// Test querying metrics with cluster and namespace filters
-	testClusterMatch(t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{cluster="nerc-ocp-test",namespace="test"}`,
+	testClusterMatch(false, t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{cluster="nerc-ocp-test",namespace="test"}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -413,7 +500,7 @@ func TestNamespaceMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with namespace filter but no cluster filter
-	testClusterMatch(t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{namespace="test"}`,
+	testClusterMatch(false, t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{namespace="test"}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -427,7 +514,7 @@ func TestNamespaceMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with regex namespace filter
-	testClusterMatch(t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{cluster="nerc-ocp-test",namespace=~"namespace-a|namespace-b"}`,
+	testClusterMatch(false, t, proxyAcmHub, `namespace:container_memory_usage_bytes:sum{cluster="nerc-ocp-test",namespace=~"namespace-a|namespace-b"}`,
 		[][][]string{
 			{
 				{hubKey},
@@ -446,7 +533,7 @@ func TestNamespaceMatches(t *testing.T) {
 	)
 
 	// Test more complex query querying metrics with regex namespace filter
-	testClusterMatch(t, proxyAcmHub, `rate(namespace:container_memory_usage_bytes:sum{namespace=~"namespace-a|namespace-b"}[1m]) + rate(namespace:container_memory_usage_bytes:sum{cluster="local-cluster",namespace="namespace-b"}[1m])`,
+	testClusterMatch(false, t, proxyAcmHub, `rate(namespace:container_memory_usage_bytes:sum{namespace=~"namespace-a|namespace-b"}[1m]) + rate(namespace:container_memory_usage_bytes:sum{cluster="local-cluster",namespace="namespace-b"}[1m])`,
 		[][][]string{
 			{
 				{hubKey},
@@ -470,11 +557,11 @@ func TestNamespaceMatches(t *testing.T) {
 
 /* Assisted by Claude */
 // Tests the use case of GPU metrics with the exported_namespace filter.
-func TestGpuExportedNamespaceMatches(t *testing.T) {
+func TestAcmGpuExportedNamespaceMatches(t *testing.T) {
 	proxyAcmHub := "test-hub-3"
 
 	// Test querying metrics with cluster and exported_namespace filters
-	testClusterMatch(t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster="nerc-ocp-test",exported_namespace="test"})`,
+	testClusterMatch(false, t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster="nerc-ocp-test",exported_namespace="test"})`,
 		[][][]string{
 			{
 				{hubKey},
@@ -492,7 +579,7 @@ func TestGpuExportedNamespaceMatches(t *testing.T) {
 	)
 
 	// Test querying metrics with exported_namespace filter only
-	testClusterMatch(t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{exported_namespace="test"})`,
+	testClusterMatch(false, t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{exported_namespace="test"})`,
 		[][][]string{
 			{
 				{hubKey},
@@ -506,7 +593,7 @@ func TestGpuExportedNamespaceMatches(t *testing.T) {
 	)
 
 	// Test more complex query with multiple exported_namespace filters
-	testClusterMatch(t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster="nerc-ocp-test",exported_namespace="test"}) + sum(gpu_operator_gpu_nodes_total{cluster="local-cluster",exported_namespace=~"prod|exporter"})`,
+	testClusterMatch(false, t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster="nerc-ocp-test",exported_namespace="test"}) + sum(gpu_operator_gpu_nodes_total{cluster="local-cluster",exported_namespace=~"prod|exporter"})`,
 		[][][]string{
 			{
 				{hubKey},
@@ -533,7 +620,7 @@ func TestGpuExportedNamespaceMatches(t *testing.T) {
 	)
 
 	// Test complex query with mixed namespace and exported_namespace filters
-	testClusterMatch(t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster=~"nerc-ocp-test|nerc-ocp-prod",namespace="frontend",exported_namespace="monitoring"}) + sum(container_memory_usage_bytes{cluster="local-cluster",namespace=~"backend|api",exported_namespace="logging"})`,
+	testClusterMatch(false, t, proxyAcmHub, `sum(gpu_operator_gpu_nodes_total{cluster=~"nerc-ocp-test|nerc-ocp-prod",namespace="frontend",exported_namespace="monitoring"}) + sum(container_memory_usage_bytes{cluster="local-cluster",namespace=~"backend|api",exported_namespace="logging"})`,
 		[][][]string{
 			{
 				{hubKey},

@@ -144,7 +144,7 @@ func AppendMatcher(queryValues url.Values, queryValuesForAuth url.Values, key st
 //	  HUB-hub-CLUSTER-c3-PROJECT-n3,
 //	  HUB-hub-CLUSTER-c3-PROJECT-n4,
 //	}
-func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hub string, promqlQuery string) ([][][]string, []string) {
+func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hub string, openshiftLocal bool, promqlQuery string) ([][][]string, []string) {
 	expr, exprErr := parser.ParseExpr(promqlQuery)
 	if exprErr != nil {
 		log.Panic(exprErr)
@@ -190,17 +190,19 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 			}
 		}
 
-		if clusterMatcher == nil || clusterMatcher.Value == "" {
+		if !openshiftLocal && (clusterMatcher == nil || clusterMatcher.Value == "") {
 			continue
 		}
 
 		var clusterValues []string
-		if clusterMatcher.Type == labels.MatchEqual {
-			clusterValues = append(clusterValues, clusterMatcher.Value)
-		} else {
-			clusterValues = strings.Split(clusterMatcher.Value, "|")
-			for j, clusterValue := range clusterValues {
-				clusterValues[j] = regexp.QuoteMeta(clusterValue)
+		if !openshiftLocal {
+			if clusterMatcher.Type == labels.MatchEqual {
+				clusterValues = append(clusterValues, clusterMatcher.Value)
+			} else {
+				clusterValues = strings.Split(clusterMatcher.Value, "|")
+				for j, clusterValue := range clusterValues {
+					clusterValues[j] = regexp.QuoteMeta(clusterValue)
+				}
 			}
 		}
 
@@ -236,7 +238,9 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 				clusterResources = append(clusterResources, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue))
 				uniqueResources[fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue)] = struct{}{}
 			}
-			resources[i] = append(resources[i], clusterResources)
+			if !openshiftLocal {
+				resources[i] = append(resources[i], clusterResources)
+			}
 			continue
 		}
 
@@ -247,22 +251,38 @@ func ParseAuthorizations(hubKey string, clusterKey string, projectKey string, hu
 		// a binary integer variable can represent all combinations of 1s and 0s up to a max value (totalCombinations) by incrementing
 		// we want to append either the cluster-scoped resource name or the namespace-scoped resource names
 		// we can do this by associating the 1s and 0s to cluster-scoped and namespace-scoped resource names
-		var combinationBitMap int
-		for combinationBitMap = 0; combinationBitMap < totalCombinations; combinationBitMap++ {
-			var namespaceResources []string
-			for bitOffset, clusterValue := range clusterValues {
-				if (combinationBitMap>>bitOffset)&1 == 0 {
-					namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue))
-					uniqueResources[fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue)] = struct{}{}
-				} else {
-					for _, namespaceValue := range namespaceValues {
-						namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue))
-						uniqueResources[fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue)] = struct{}{}
+		if !openshiftLocal {
+			// Determine resources for Red Hat Advanced Cluster Management Observability clusters
+			var combinationBitMap int
+			for combinationBitMap = 0; combinationBitMap < totalCombinations; combinationBitMap++ {
+				var namespaceResources []string
+				for bitOffset, clusterValue := range clusterValues {
+					if (combinationBitMap>>bitOffset)&1 == 0 {
+						namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue))
+						uniqueResources[fmt.Sprintf("%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue)] = struct{}{}
+					} else {
+						for _, namespaceValue := range namespaceValues {
+							namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue))
+							uniqueResources[fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue)] = struct{}{}
+						}
 					}
 				}
-			}
 
-			resources[i] = append(resources[i], namespaceResources)
+				resources[i] = append(resources[i], namespaceResources)
+			}
+		} else {
+			// Determine resources for OpenShift Local clusters
+			clusterValue := ""
+			var combinationBitMap int
+			for combinationBitMap = 0; combinationBitMap < totalCombinations; combinationBitMap++ {
+				var namespaceResources []string
+				for _, namespaceValue := range namespaceValues {
+					namespaceResources = append(namespaceResources, fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue))
+					uniqueResources[fmt.Sprintf("%s-%s-%s-%s-%s-%s", hubKey, hub, clusterKey, clusterValue, projectKey, namespaceValue)] = struct{}{}
+				}
+
+				resources[i] = append(resources[i], namespaceResources)
+			}
 		}
 		/* END assisted by Claude */
 	}
