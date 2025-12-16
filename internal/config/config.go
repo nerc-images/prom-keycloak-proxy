@@ -24,6 +24,7 @@ type ProxyConfig struct {
 	PrometheusTlsCert  string   `validate:"omitempty,file"`
 	PrometheusTlsKey   string   `validate:"omitempty,file"`
 	PrometheusToken    string   `validate:"omitempty,ascii"`
+	OpenshiftLocal     bool     `validate:"boolean"`
 }
 
 // NewValidator returns a new validator with our custom
@@ -64,5 +65,6 @@ func BuildFromViper(v ViperInterface) *ProxyConfig {
 		PrometheusTlsCert:  v.GetString("proxy-prometheus-tls-cert"),
 		PrometheusTlsKey:   v.GetString("proxy-prometheus-tls-key"),
 		PrometheusToken:    v.GetString("proxy-prometheus-token"),
+		OpenshiftLocal:     v.GetBool("openshift-local"),
 	}
 }
